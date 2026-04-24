@@ -31,13 +31,13 @@ Currently implemented in this repository:
 
 - `postgres` in `docker-compose.dev.yml`
 - `adminer` in `docker-compose.dev.yml`
+- `auth-service` in `docker-compose.dev.yml`
 
 Planned next additions, in order:
 
-1. `auth-service`
-2. `notes-data-service`
-3. `notes-service`
-4. full local verification of the core stack
+1. `notes-data-service`
+2. `notes-service`
+3. full local verification of the core stack
 
 ## Local Stack Layout
 
@@ -91,6 +91,7 @@ At the moment it provisions:
 
 - `postgres`
 - `adminer`
+- `auth-service`
 
 It will be extended step by step instead of adding the whole platform at once.
 
@@ -107,6 +108,14 @@ Current useful command:
 ```bash
 docker compose -f docker-compose.dev.yml down
 ```
+
+## Currently Exposed Local Services
+
+After starting the current stack, these services are available from the host:
+
+- `postgres` on `127.0.0.1:5433`
+- `adminer` on `127.0.0.1:8080`
+- `auth-service` on `127.0.0.1:8001`
 
 ## Database Access In Browser
 
@@ -125,6 +134,15 @@ Use the following connection values:
 - Database: `noteflow`
 
 If you connect through Docker Compose networking, `postgres` is the correct server name because it is the Docker service name.
+
+## Auth Service In Compose
+
+`auth-service` is now configured to connect to PostgreSQL through the Docker service name:
+
+- `DATABASE_HOST=postgres`
+- `DATABASE_PORT=5432`
+
+This is the correct local container-to-container setup and avoids WSL-specific IP workarounds.
 
 ## Working Rules
 
