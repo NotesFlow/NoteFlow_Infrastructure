@@ -37,7 +37,9 @@ Currently implemented in this repository:
 
 Planned next additions, in order:
 
-1. full local verification of the core stack
+1. `kong`
+2. monitoring
+3. swarm and ci/cd
 
 ## Local Stack Layout
 
@@ -97,6 +99,8 @@ At the moment it provisions:
 
 It will be extended step by step instead of adding the whole platform at once.
 
+The core local stack is now functional and verified.
+
 ## Run Locally
 
 Current command:
@@ -109,6 +113,12 @@ Current useful command:
 
 ```bash
 docker compose -f docker-compose.dev.yml down
+```
+
+To rebuild services after code or configuration changes:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
 ```
 
 ## Currently Exposed Local Services
@@ -169,6 +179,129 @@ The service is exposed locally on:
 The service is exposed locally on:
 
 - `http://127.0.0.1:8002`
+
+## Verified Local MVP Flow
+
+The following flow has been verified successfully through the Docker Compose stack:
+
+1. `POST /register`
+2. `POST /login`
+3. `POST /notes`
+4. `GET /notes`
+5. `PUT /notes/{id}`
+6. `PATCH /notes/{id}/archive`
+7. `PATCH /notes/{id}/pin`
+8. `DELETE /notes/{id}`
+9. update after delete returns `404`
+
+Verified status codes:
+
+- `register` -> `201`
+- `login` -> `200`
+- `create note` -> `201`
+- `list notes` -> `200`
+- `update note` -> `200`
+- `archive note` -> `200`
+- `pin note` -> `200`
+- `delete note` -> `204`
+- `update after delete` -> `404`
+
+## Recommended Manual Workflow
+
+1. Start the stack:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+2. Open Swagger for `auth-service`:
+
+```text
+http://127.0.0.1:8001/docs
+```
+
+3. Register and login a test user.
+
+4. Copy the returned JWT access token.
+
+5. Open Swagger for `notes-service`:
+
+```text
+http://127.0.0.1:8002/docs
+```
+
+6. Click `Authorize` and paste the Bearer token.
+
+7. Test:
+
+- `GET /notes`
+- `POST /notes`
+- `PUT /notes/{note_id}`
+- `PATCH /notes/{note_id}/archive`
+- `PATCH /notes/{note_id}/pin`
+- `DELETE /notes/{note_id}`
+
+8. Open Adminer:
+
+```text
+http://127.0.0.1:8080
+```
+
+9. Confirm that the `users` and `notes` tables contain the expected data.
+
+## Troubleshooting
+
+### Port Variables In `.env`
+
+The local `.env` file in this repository must contain all service ports:
+
+- `POSTGRES_PORT`
+- `ADMINER_PORT`
+- `AUTH_SERVICE_PORT`
+- `NOTES_DATA_SERVICE_PORT`
+- `NOTES_SERVICE_PORT`
+
+If one of these variables is missing, Docker Compose may create the container with an empty port value or assign a random published port.
+
+If that happens:
+
+1. update `.env`
+2. recreate the affected container
+
+Example:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --force-recreate notes-service
+```
+
+### Recreating Services After Env Changes
+
+If you change `.env` after a container was already created, the running container will not automatically pick up the new values.
+
+Recreate the service explicitly:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --force-recreate auth-service
+docker compose -f docker-compose.dev.yml up -d --force-recreate notes-data-service
+docker compose -f docker-compose.dev.yml up -d --force-recreate notes-service
+```
+
+### Check Running Containers
+
+Useful command:
+
+```bash
+docker ps
+```
+
+### Check Service Health Quickly
+
+Useful endpoints:
+
+- `http://127.0.0.1:8001/health`
+- `http://127.0.0.1:8002/health`
+- `http://127.0.0.1:8003/health`
+- `http://127.0.0.1:8003/health/db`
 
 ## Working Rules
 
