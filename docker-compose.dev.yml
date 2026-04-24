@@ -37,6 +37,24 @@ services:
     ports:
       - "${AUTH_SERVICE_PORT}:8001"
 
+  notes-data-service:
+    build:
+      context: ../NoteFlow_Notes-Data-service
+    container_name: noteflow-notes-data-service
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    environment:
+      NOTES_DATA_SERVICE_HOST: 0.0.0.0
+      NOTES_DATA_SERVICE_PORT: ${NOTES_DATA_SERVICE_PORT}
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB}
+      DATABASE_USER: ${POSTGRES_USER}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
+    ports:
+      - "${NOTES_DATA_SERVICE_PORT}:8003"
+
   adminer:
     image: adminer:4
     container_name: noteflow-adminer

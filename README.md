@@ -32,12 +32,12 @@ Currently implemented in this repository:
 - `postgres` in `docker-compose.dev.yml`
 - `adminer` in `docker-compose.dev.yml`
 - `auth-service` in `docker-compose.dev.yml`
+- `notes-data-service` in `docker-compose.dev.yml`
 
 Planned next additions, in order:
 
-1. `notes-data-service`
-2. `notes-service`
-3. full local verification of the core stack
+1. `notes-service`
+2. full local verification of the core stack
 
 ## Local Stack Layout
 
@@ -92,6 +92,7 @@ At the moment it provisions:
 - `postgres`
 - `adminer`
 - `auth-service`
+- `notes-data-service`
 
 It will be extended step by step instead of adding the whole platform at once.
 
@@ -116,6 +117,7 @@ After starting the current stack, these services are available from the host:
 - `postgres` on `127.0.0.1:5433`
 - `adminer` on `127.0.0.1:8080`
 - `auth-service` on `127.0.0.1:8001`
+- `notes-data-service` on `127.0.0.1:8003`
 
 ## Database Access In Browser
 
@@ -143,6 +145,17 @@ If you connect through Docker Compose networking, `postgres` is the correct serv
 - `DATABASE_PORT=5432`
 
 This is the correct local container-to-container setup and avoids WSL-specific IP workarounds.
+
+## Notes Data Service In Compose
+
+`notes-data-service` is also configured to connect to PostgreSQL through Docker DNS:
+
+- `DATABASE_HOST=postgres`
+- `DATABASE_PORT=5432`
+
+The service is exposed locally on:
+
+- `http://127.0.0.1:8003`
 
 ## Working Rules
 
