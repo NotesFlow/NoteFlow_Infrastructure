@@ -30,14 +30,14 @@ The following components are intentionally postponed:
 Currently implemented in this repository:
 
 - `postgres` in `docker-compose.dev.yml`
+- `adminer` in `docker-compose.dev.yml`
 
 Planned next additions, in order:
 
-1. `adminer`
-2. `auth-service`
-3. `notes-data-service`
-4. `notes-service`
-5. full local verification of the core stack
+1. `auth-service`
+2. `notes-data-service`
+3. `notes-service`
+4. full local verification of the core stack
 
 ## Local Stack Layout
 
@@ -87,7 +87,12 @@ These ports are the standard local ports we will keep across the project unless 
 
 - [docker-compose.dev.yml](docker-compose.dev.yml)
 
-At the moment it only provisions PostgreSQL. It will be extended step by step instead of adding the whole platform at once.
+At the moment it provisions:
+
+- `postgres`
+- `adminer`
+
+It will be extended step by step instead of adding the whole platform at once.
 
 ## Run Locally
 
@@ -102,6 +107,24 @@ Current useful command:
 ```bash
 docker compose -f docker-compose.dev.yml down
 ```
+
+## Database Access In Browser
+
+After starting the local stack, Adminer is available at:
+
+```text
+http://127.0.0.1:8080
+```
+
+Use the following connection values:
+
+- System: `PostgreSQL`
+- Server: `postgres`
+- Username: `noteflow_user`
+- Password: `noteflow_pass`
+- Database: `noteflow`
+
+If you connect through Docker Compose networking, `postgres` is the correct server name because it is the Docker service name.
 
 ## Working Rules
 

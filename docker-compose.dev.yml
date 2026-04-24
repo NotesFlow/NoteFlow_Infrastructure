@@ -14,5 +14,14 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
+  adminer:
+    image: adminer:4
+    container_name: noteflow-adminer
+    restart: unless-stopped
+    depends_on:
+      - postgres
+    ports:
+      - "${ADMINER_PORT}:8080"
+
 volumes:
   postgres_data:
