@@ -55,6 +55,26 @@ services:
     ports:
       - "${NOTES_DATA_SERVICE_PORT}:8003"
 
+  notes-service:
+    build:
+      context: ../NoteFlow_Notes-service
+    container_name: noteflow-notes-service
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - notes-data-service
+    environment:
+      APP_NAME: NoteFlow Notes Service
+      APP_VERSION: 0.1.0
+      DEBUG: "false"
+      NOTES_SERVICE_HOST: 0.0.0.0
+      NOTES_SERVICE_PORT: ${NOTES_SERVICE_PORT}
+      AUTH_SERVICE_URL: http://auth-service:8001
+      NOTES_DATA_SERVICE_URL: http://notes-data-service:8003
+      REQUEST_TIMEOUT_SECONDS: 5.0
+    ports:
+      - "${NOTES_SERVICE_PORT}:8002"
+
   adminer:
     image: adminer:4
     container_name: noteflow-adminer

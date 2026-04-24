@@ -33,11 +33,11 @@ Currently implemented in this repository:
 - `adminer` in `docker-compose.dev.yml`
 - `auth-service` in `docker-compose.dev.yml`
 - `notes-data-service` in `docker-compose.dev.yml`
+- `notes-service` in `docker-compose.dev.yml`
 
 Planned next additions, in order:
 
-1. `notes-service`
-2. full local verification of the core stack
+1. full local verification of the core stack
 
 ## Local Stack Layout
 
@@ -93,6 +93,7 @@ At the moment it provisions:
 - `adminer`
 - `auth-service`
 - `notes-data-service`
+- `notes-service`
 
 It will be extended step by step instead of adding the whole platform at once.
 
@@ -118,6 +119,7 @@ After starting the current stack, these services are available from the host:
 - `adminer` on `127.0.0.1:8080`
 - `auth-service` on `127.0.0.1:8001`
 - `notes-data-service` on `127.0.0.1:8003`
+- `notes-service` on `127.0.0.1:8002`
 
 ## Database Access In Browser
 
@@ -156,6 +158,17 @@ This is the correct local container-to-container setup and avoids WSL-specific I
 The service is exposed locally on:
 
 - `http://127.0.0.1:8003`
+
+## Notes Service In Compose
+
+`notes-service` is configured to call the other services through Docker DNS:
+
+- `AUTH_SERVICE_URL=http://auth-service:8001`
+- `NOTES_DATA_SERVICE_URL=http://notes-data-service:8003`
+
+The service is exposed locally on:
+
+- `http://127.0.0.1:8002`
 
 ## Working Rules
 
