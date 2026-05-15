@@ -314,3 +314,112 @@ For this repository, the implementation order stays fixed:
 5. swarm and ci/cd last
 
 The infrastructure repo should never get ahead of the application itself.
+
+## Monitoring: Prometheus și Grafana
+
+Stack-ul local include acum monitorizare pentru cele 3 microservicii FastAPI.
+
+Servicii adăugate în `docker-compose.dev.yml`:
+
+- `prometheus` pe `http://127.0.0.1:9090`
+- `grafana` pe `http://127.0.0.1:3000`
+
+Variabile noi în `.env`:
+
+```env
+PROMETHEUS_PORT=9090
+GRAFANA_PORT=3000
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
+```
+
+Fiecare microserviciu expune endpoint-ul:
+
+```text
+/metrics
+```
+
+Endpoint-uri utile:
+
+- `http://127.0.0.1:8001/metrics` pentru `auth-service`
+- `http://127.0.0.1:8002/metrics` pentru `notes-service`
+- `http://127.0.0.1:8003/metrics` pentru `notes-data-service`
+- `http://127.0.0.1:9090/targets` pentru target-urile Prometheus
+- `http://127.0.0.1:3000` pentru Grafana
+
+Grafana este provisionat automat cu:
+
+- datasource Prometheus
+- dashboard `NoteFlow FastAPI Monitoring`
+
+Login Grafana implicit:
+
+- user: `admin`
+- password: `admin`
+
+### Testare rapidă monitorizare
+
+1. Pornește stack-ul:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --build
+```
+
+2. Generează trafic în Swagger:
+
+```text
+http://127.0.0.1:8001/docs
+http://127.0.0.1:8002/docs
+```
+
+3. Verifică Prometheus targets:
+
+```text
+http://127.0.0.1:9090/targets
+```
+
+Toate target-urile trebuie să fie `UP`:
+
+- `auth-service`
+- `notes-service`
+- `notes-data-service`
+- `prometheus`
+
+4. Deschide Grafana:
+
+```text
+http://127.0.0.1:3000
+```
+
+5. Intră în dashboard-ul:
+
+```text
+Dashboards -> NoteFlow -> NoteFlow FastAPI Monitoring
+```
+
+Dashboard-ul afișează:
+
+- request rate pe serviciu
+- status code-uri HTTP
+- latență p95
+- uptime pentru target-uri
+
+### Comenzi utile
+
+Verifică logurile Prometheus:
+
+```bash
+docker logs noteflow-prometheus
+```
+
+Verifică logurile Grafana:
+
+```bash
+docker logs noteflow-grafana
+```
+
+Recreează doar monitorizarea:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d --force-recreate prometheus grafana
+```
