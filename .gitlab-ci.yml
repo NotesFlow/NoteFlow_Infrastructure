@@ -1,0 +1,24 @@
+stages:
+  - validate
+  - deploy
+
+validate_stack:
+  stage: validate
+  image: docker:24
+  services:
+    - docker:24-dind
+  script:
+    - docker compose -f docker-compose.dev.yml config
+  only:
+    - main
+
+deploy_swarm:
+  stage: deploy
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache openssh-client
+  script:
+    - ssh $DEPLOY_USER@$DEPLOY_HOST "cd $DEPLOY_PATH && docker stack deploy -c stack.yml noteflow"
+  only:
+    - main
+  when: manual
