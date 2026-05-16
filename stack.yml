@@ -1,0 +1,286 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-noteflow}
+      POSTGRES_USER: ${POSTGRES_USER:-noteflow_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-noteflow_pass}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=database"
+        - "noteflow.stage=final"
+
+  auth-service:
+    image: ${DOCKERHUB_NAMESPACE:-noteflow}/auth-service:${IMAGE_TAG:-latest}
+    environment:
+      AUTH_SERVICE_PORT: 8001
+      APP_NAME: NoteFlow Auth Service
+      APP_VERSION: 1.0.0
+      DEBUG: "false"
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB:-noteflow}
+      DATABASE_USER: ${POSTGRES_USER:-noteflow_user}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-noteflow_pass}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change_this_to_a_long_random_secret_key_32_chars_min}
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    networks:
+      - gateway_net
+      - app_net
+      - data_net
+      - monitoring_net
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      rollback_config:
+        parallelism: 1
+        order: stop-first
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=microservice"
+        - "noteflow.service=auth-service"
+        - "noteflow.stage=final"
+
+  notes-data-service:
+    image: ${DOCKERHUB_NAMESPACE:-noteflow}/notes-data-service:${IMAGE_TAG:-latest}
+    environment:
+      NOTES_DATA_SERVICE_HOST: 0.0.0.0
+      NOTES_DATA_SERVICE_PORT: 8003
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${POSTGRES_DB:-noteflow}
+      DATABASE_USER: ${POSTGRES_USER:-noteflow_user}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-noteflow_pass}
+    networks:
+      - app_net
+      - data_net
+      - monitoring_net
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=microservice"
+        - "noteflow.service=notes-data-service"
+        - "noteflow.stage=final"
+
+  notes-service:
+    image: ${DOCKERHUB_NAMESPACE:-noteflow}/notes-service:${IMAGE_TAG:-latest}
+    environment:
+      APP_NAME: NoteFlow Notes Service
+      APP_VERSION: 1.0.0
+      DEBUG: "false"
+      NOTES_SERVICE_HOST: 0.0.0.0
+      NOTES_SERVICE_PORT: 8002
+      AUTH_SERVICE_URL: http://auth-service:8001
+      NOTES_DATA_SERVICE_URL: http://notes-data-service:8003
+      REQUEST_TIMEOUT_SECONDS: 5.0
+    networks:
+      - gateway_net
+      - app_net
+      - monitoring_net
+    deploy:
+      replicas: 2
+      update_config:
+        parallelism: 1
+        delay: 10s
+        order: start-first
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=microservice"
+        - "noteflow.service=notes-service"
+        - "noteflow.stage=final"
+
+  adminer:
+    image: adminer:4
+    ports:
+      - "${ADMINER_PORT:-8080}:8080"
+    networks:
+      - admin_net
+      - data_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=db-utility"
+        - "noteflow.stage=final"
+
+  kong:
+    image: kong:3.8
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    configs:
+      - source: kong_config
+        target: /kong/declarative/kong.yml
+    ports:
+      - "${KONG_PROXY_PORT:-8000}:8000"
+      - "${KONG_ADMIN_PORT:-8005}:8001"
+    networks:
+      - gateway_net
+      - app_net
+    deploy:
+      replicas: 2
+      placement:
+        preferences:
+          - spread: node.id
+      update_config:
+        parallelism: 1
+        order: start-first
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=api-gateway"
+        - "noteflow.stage=final"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    volumes:
+      - prometheus_data:/prometheus
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    networks:
+      - monitoring_net
+      - app_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=monitoring"
+        - "noteflow.stage=final"
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3000}:3000"
+    networks:
+      - monitoring_net
+      - admin_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=dashboard"
+        - "noteflow.stage=final"
+
+  portainer-agent:
+    image: portainer/agent:2.21.4
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - agent_net
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.platform.os == linux
+      labels:
+        - "noteflow.deployment=swarm-management-agent"
+        - "noteflow.stage=final"
+
+  portainer:
+    image: portainer/portainer-ce:2.21.4
+    command: -H tcp://tasks.portainer-agent:9001 --tlsskipverify
+    ports:
+      - "${PORTAINER_PORT:-9000}:9000"
+      - "${PORTAINER_HTTPS_PORT:-9443}:9443"
+    volumes:
+      - portainer_data:/data
+    networks:
+      - admin_net
+      - agent_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+      labels:
+        - "noteflow.deployment=swarm-management-ui"
+        - "noteflow.stage=final"
+
+configs:
+  prometheus_config:
+    file: ./prometheus.yml
+  kong_config:
+    file: ./kong/kong.yml
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+  portainer_data:
+
+networks:
+  gateway_net:
+    driver: overlay
+    attachable: true
+  app_net:
+    driver: overlay
+    attachable: true
+  data_net:
+    driver: overlay
+    attachable: true
+  monitoring_net:
+    driver: overlay
+    attachable: true
+  admin_net:
+    driver: overlay
+    attachable: true
+  agent_net:
+    driver: overlay
+    attachable: true

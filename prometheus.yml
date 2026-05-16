@@ -1,0 +1,27 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+scrape_configs:
+  - job_name: prometheus
+    static_configs:
+      - targets:
+          - prometheus:9090
+
+  - job_name: auth-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - auth-service:8001
+
+  - job_name: notes-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - notes-service:8002
+
+  - job_name: notes-data-service
+    metrics_path: /metrics
+    static_configs:
+      - targets:
+          - notes-data-service:8003
