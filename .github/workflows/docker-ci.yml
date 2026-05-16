@@ -23,6 +23,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./NoteFlow_Auth-service
+          file: ./NoteFlow_Auth-service/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/noteflow-auth-service:latest
 
@@ -30,6 +31,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./NoteFlow_Notes-service
+          file: ./NoteFlow_Notes-service/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/noteflow-notes-service:latest
 
@@ -37,5 +39,6 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: ./NoteFlow_Notes-Data-service
+          file: ./NoteFlow_Notes-Data-service/Dockerfile
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/noteflow-notes-data-service:latest
