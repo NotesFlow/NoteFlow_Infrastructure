@@ -266,3 +266,4 @@ care validează Compose și stack-ul Swarm.
 - arăți dashboard-ul în Grafana
 - arăți `stack.yml` cu `deploy`, replici și rețele separate
 - arăți workflow-urile GitHub Actions
+# trigger
