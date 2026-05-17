@@ -13,6 +13,8 @@ services:
       - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - data_net
 
   auth-service:
     build:
@@ -36,6 +38,9 @@ services:
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     ports:
       - "${AUTH_SERVICE_PORT}:8001"
+    networks:
+      - app_net
+      - data_net
 
   notes-data-service:
     build:
@@ -54,6 +59,9 @@ services:
       DATABASE_PASSWORD: ${POSTGRES_PASSWORD}
     ports:
       - "${NOTES_DATA_SERVICE_PORT}:8003"
+    networks:
+      - app_net
+      - data_net
 
   notes-service:
     build:
@@ -74,6 +82,8 @@ services:
       REQUEST_TIMEOUT_SECONDS: 5.0
     ports:
       - "${NOTES_SERVICE_PORT}:8002"
+    networks:
+      - app_net
 
   adminer:
     image: adminer:4
@@ -83,6 +93,21 @@ services:
       - postgres
     ports:
       - "${ADMINER_PORT}:8080"
+    networks:
+      - admin_net
+      - data_net
 
 volumes:
   postgres_data:
+
+networks:
+  gateway_net:
+    driver: bridge
+  app_net:
+    driver: bridge
+  data_net:
+    driver: bridge
+  monitoring_net:
+    driver: bridge
+  admin_net:
+    driver: bridge

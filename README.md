@@ -34,12 +34,14 @@ Currently implemented in this repository:
 - `auth-service` in `docker-compose.dev.yml`
 - `notes-data-service` in `docker-compose.dev.yml`
 - `notes-service` in `docker-compose.dev.yml`
+- explicit Docker networks for local service separation
 
 Planned next additions, in order:
 
 1. `kong`
 2. monitoring
-3. swarm and ci/cd
+3. `portainer`
+4. swarm and ci/cd
 
 ## Local Stack Layout
 
@@ -65,6 +67,40 @@ Examples:
 - `auth-service`
 - `notes-service`
 - `notes-data-service`
+
+## Local Docker Networks
+
+The local Compose stack uses explicit bridge networks to keep service responsibilities clear:
+
+```text
+app_net
+  auth-service
+  notes-service
+  notes-data-service
+
+data_net
+  postgres
+  auth-service
+  notes-data-service
+  adminer
+
+admin_net
+  adminer
+
+gateway_net
+  reserved for Kong
+
+monitoring_net
+  reserved for Prometheus and Grafana
+```
+
+The current network rules are:
+
+- `notes-service` can call `auth-service` and `notes-data-service` through `app_net`.
+- `auth-service` can call `postgres` through `data_net`.
+- `notes-data-service` can call `postgres` through `data_net`.
+- `adminer` can inspect `postgres` through `data_net`.
+- `gateway_net` and `monitoring_net` are defined now so the next infrastructure phases can be added cleanly.
 
 ## Environment Variables
 
