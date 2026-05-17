@@ -1,0 +1,269 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: noteflow
+      POSTGRES_USER: noteflow_user
+      POSTGRES_PASSWORD: noteflow_pass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - target: 5432
+        published: 5433
+        protocol: tcp
+        mode: ingress
+    networks:
+      - data_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  auth-service:
+    image: noteflow-auth-service:local
+    environment:
+      AUTH_SERVICE_PORT: 8001
+      APP_NAME: NoteFlow Auth Service
+      APP_VERSION: 0.1.0
+      DEBUG: "false"
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: noteflow
+      DATABASE_USER: noteflow_user
+      DATABASE_PASSWORD: noteflow_pass
+      JWT_SECRET_KEY: change_this_to_a_long_random_secret_key_32_chars_min
+      JWT_ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    ports:
+      - target: 8001
+        published: 8001
+        protocol: tcp
+        mode: ingress
+    networks:
+      - app_net
+      - data_net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  notes-data-service:
+    image: noteflow-notes-data-service:local
+    environment:
+      NOTES_DATA_SERVICE_HOST: 0.0.0.0
+      NOTES_DATA_SERVICE_PORT: 8003
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: noteflow
+      DATABASE_USER: noteflow_user
+      DATABASE_PASSWORD: noteflow_pass
+    ports:
+      - target: 8003
+        published: 8003
+        protocol: tcp
+        mode: ingress
+    networks:
+      - app_net
+      - data_net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  notes-service:
+    image: noteflow-notes-service:local
+    environment:
+      APP_NAME: NoteFlow Notes Service
+      APP_VERSION: 0.1.0
+      DEBUG: "false"
+      NOTES_SERVICE_HOST: 0.0.0.0
+      NOTES_SERVICE_PORT: 8002
+      AUTH_SERVICE_URL: http://auth-service:8001
+      NOTES_DATA_SERVICE_URL: http://notes-data-service:8003
+      REQUEST_TIMEOUT_SECONDS: 5.0
+    ports:
+      - target: 8002
+        published: 8002
+        protocol: tcp
+        mode: ingress
+    networks:
+      - app_net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  kong:
+    image: kong:3.8
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    configs:
+      - source: kong_config
+        target: /kong/declarative/kong.yml
+    ports:
+      - target: 8000
+        published: 8000
+        protocol: tcp
+        mode: ingress
+      - target: 8001
+        published: 8005
+        protocol: tcp
+        mode: ingress
+    networks:
+      - gateway_net
+      - app_net
+    deploy:
+      replicas: 2
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 5
+
+  adminer:
+    image: adminer:4
+    ports:
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: ingress
+    networks:
+      - admin_net
+      - data_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    configs:
+      - source: prometheus_config
+        target: /etc/prometheus/prometheus.yml
+    volumes:
+      - prometheus_data:/prometheus
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --web.enable-lifecycle
+    ports:
+      - target: 9090
+        published: 9090
+        protocol: tcp
+        mode: ingress
+    networks:
+      - monitoring_net
+      - app_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana:11.3.1
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    configs:
+      - source: grafana_datasource
+        target: /etc/grafana/provisioning/datasources/prometheus.yml
+      - source: grafana_dashboard_provider
+        target: /etc/grafana/provisioning/dashboards/noteflow.yml
+      - source: grafana_dashboard
+        target: /var/lib/grafana/dashboards/noteflow-fastapi.json
+    volumes:
+      - grafana_data:/var/lib/grafana
+    ports:
+      - target: 3000
+        published: 3000
+        protocol: tcp
+        mode: ingress
+    networks:
+      - monitoring_net
+      - admin_net
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: on-failure
+
+  portainer-agent:
+    image: portainer/agent:lts
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /var/lib/docker/volumes:/var/lib/docker/volumes
+    networks:
+      - admin_net
+    deploy:
+      mode: global
+      placement:
+        constraints:
+          - node.platform.os == linux
+      restart_policy:
+        condition: on-failure
+
+  portainer:
+    image: portainer/portainer-ce:lts
+    command: -H tcp://tasks.portainer-agent:9001 --tlsskipverify
+    volumes:
+      - portainer_data:/data
+    ports:
+      - target: 9000
+        published: 9000
+        protocol: tcp
+        mode: ingress
+    networks:
+      - admin_net
+    deploy:
+      replicas: 1
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
+configs:
+  kong_config:
+    file: ./kong/kong.yml
+  prometheus_config:
+    file: ./prometheus.yml
+  grafana_datasource:
+    file: ./grafana/provisioning/datasources/prometheus.yml
+  grafana_dashboard_provider:
+    file: ./grafana/provisioning/dashboards/noteflow.yml
+  grafana_dashboard:
+    file: ./grafana/dashboards/noteflow-fastapi.json
+
+volumes:
+  postgres_data:
+  prometheus_data:
+  grafana_data:
+  portainer_data:
+
+networks:
+  gateway_net:
+    driver: overlay
+    attachable: true
+  app_net:
+    driver: overlay
+    attachable: true
+  data_net:
+    driver: overlay
+    attachable: true
+  monitoring_net:
+    driver: overlay
+    attachable: true
+  admin_net:
+    driver: overlay
+    attachable: true

@@ -19,10 +19,10 @@ At this stage, the goal is to support the local MVP flow:
 - `prometheus`
 - `grafana`
 - `portainer`
+- docker swarm
 
 The following components are intentionally postponed:
 
-- `docker swarm`
 - `ci/cd`
 
 ## Current Status
@@ -39,11 +39,11 @@ Currently implemented in this repository:
 - `prometheus` in `docker-compose.dev.yml`
 - `grafana` in `docker-compose.dev.yml`
 - `portainer` in `docker-compose.dev.yml`
+- `stack.yml` for Docker Swarm deployment
 
 Planned next additions, in order:
 
-1. swarm
-2. ci/cd
+1. ci/cd
 
 ## Local Stack Layout
 
@@ -177,6 +177,39 @@ It will be extended step by step instead of adding the whole platform at once.
 
 The core local stack is now functional and verified.
 
+## Current Swarm Stack File
+
+- [stack.yml](stack.yml)
+
+The Swarm stack uses prebuilt local images for the three project microservices:
+
+- `noteflow-auth-service:local`
+- `noteflow-notes-service:local`
+- `noteflow-notes-data-service:local`
+
+This is the local demo setup. In the CI/CD phase, these local image tags should be replaced with images published to Docker Hub or another registry.
+
+The Swarm stack provisions:
+
+- `postgres`
+- `auth-service`
+- `notes-data-service`
+- `notes-service`
+- `kong`
+- `adminer`
+- `prometheus`
+- `grafana`
+- `portainer-agent`
+- `portainer`
+
+It uses overlay networks:
+
+- `gateway_net`
+- `app_net`
+- `data_net`
+- `monitoring_net`
+- `admin_net`
+
 ## Run Locally
 
 Current command:
@@ -196,6 +229,115 @@ To rebuild services after code or configuration changes:
 ```bash
 docker compose -f docker-compose.dev.yml up -d --build
 ```
+
+## Run With Docker Swarm
+
+The local Swarm demo uses `stack.yml` and local Docker images.
+
+Build the local images first:
+
+```bash
+docker build -t noteflow-auth-service:local ../NoteFlow_Auth-service
+docker build -t noteflow-notes-service:local ../NoteFlow_Notes-service
+docker build -t noteflow-notes-data-service:local ../NoteFlow_Notes-Data-service
+```
+
+If the Compose stack is already running, stop it before deploying the Swarm stack because both setups publish the same local ports:
+
+```bash
+docker compose -f docker-compose.dev.yml down
+```
+
+Initialize Swarm if it is not already active:
+
+```bash
+docker swarm init
+```
+
+Deploy the stack:
+
+```bash
+docker stack deploy --resolve-image never -c stack.yml noteflow
+```
+
+Check services:
+
+```bash
+docker stack services noteflow
+docker stack ps noteflow
+```
+
+Useful Swarm checks:
+
+```bash
+docker service ls
+docker network ls
+docker service logs noteflow_kong
+```
+
+Test the application through Kong:
+
+```text
+http://127.0.0.1:8000/auth/register
+http://127.0.0.1:8000/auth/login
+http://127.0.0.1:8000/notes
+```
+
+Remove the Swarm stack:
+
+```bash
+docker stack rm noteflow
+```
+
+Leave Swarm mode only if you no longer need it locally:
+
+```bash
+docker swarm leave --force
+```
+
+After removing the Swarm stack, the Compose stack can be started again with:
+
+```bash
+docker compose -f docker-compose.dev.yml up -d
+```
+
+## Verified Swarm Flow
+
+The Swarm stack has been verified locally with:
+
+```bash
+docker stack deploy --resolve-image never -c stack.yml noteflow
+```
+
+Verified Swarm services:
+
+- `auth-service` with 2 replicas
+- `notes-service` with 2 replicas
+- `notes-data-service` with 2 replicas
+- `kong` with 2 replicas
+- `postgres` with 1 replica
+- `adminer` with 1 replica
+- `prometheus` with 1 replica
+- `grafana` with 1 replica
+- `portainer-agent` as a global service
+- `portainer` with 1 replica
+
+Verified through Kong:
+
+- register -> `201`
+- login -> `200`
+- create note -> `201`
+- list notes -> `200`
+- update note -> `200`
+- archive note -> `200`
+- pin note -> `200`
+- delete note -> `204`
+
+Verified Swarm infrastructure:
+
+- Prometheus targets are `UP`
+- Grafana health returns `ok`
+- Portainer runs with the Swarm agent and can inspect containers, networks, and volumes
 
 ## Currently Exposed Local Services
 
