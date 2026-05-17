@@ -18,10 +18,10 @@ At this stage, the goal is to support the local MVP flow:
 - `kong`
 - `prometheus`
 - `grafana`
+- `portainer`
 
 The following components are intentionally postponed:
 
-- `portainer`
 - `docker swarm`
 - `ci/cd`
 
@@ -38,11 +38,12 @@ Currently implemented in this repository:
 - `kong` in DB-less mode
 - `prometheus` in `docker-compose.dev.yml`
 - `grafana` in `docker-compose.dev.yml`
+- `portainer` in `docker-compose.dev.yml`
 
 Planned next additions, in order:
 
-1. `portainer`
-2. swarm and ci/cd
+1. swarm
+2. ci/cd
 
 ## Local Stack Layout
 
@@ -74,6 +75,9 @@ Prometheus
 
 Grafana
   -> prometheus
+
+Portainer
+  -> Docker Engine through /var/run/docker.sock
 ```
 
 For Docker-based local development, services should communicate through Docker DNS names, not through local WSL IP addresses.
@@ -104,6 +108,8 @@ data_net
 
 admin_net
   adminer
+  grafana
+  portainer
 
 gateway_net
   kong
@@ -123,6 +129,7 @@ The current network rules are:
 - `gateway_net` is used by Kong as the public gateway layer.
 - `prometheus` scrapes metrics from the FastAPI services through `app_net`.
 - `grafana` reads metrics from Prometheus through `monitoring_net`.
+- `portainer` is attached to `admin_net` and reads Docker state through the Docker socket mount.
 
 ## Environment Variables
 
@@ -145,6 +152,7 @@ PROMETHEUS_PORT=9090
 GRAFANA_PORT=3000
 GRAFANA_ADMIN_USER=admin
 GRAFANA_ADMIN_PASSWORD=admin
+PORTAINER_PORT=9000
 ```
 
 These ports are the standard local ports we will keep across the project unless there is a concrete reason to change them.
@@ -163,6 +171,7 @@ At the moment it provisions:
 - `kong`
 - `prometheus`
 - `grafana`
+- `portainer`
 
 It will be extended step by step instead of adding the whole platform at once.
 
@@ -201,6 +210,7 @@ After starting the current stack, these services are available from the host:
 - `kong` admin API on `127.0.0.1:8005`
 - `prometheus` on `127.0.0.1:9090`
 - `grafana` on `127.0.0.1:3000`
+- `portainer` on `127.0.0.1:9000`
 
 ## Database Access In Browser
 
@@ -323,6 +333,30 @@ Grafana provisioning files:
 Dashboard:
 
 - `NoteFlow FastAPI Monitoring`
+
+## Docker Management With Portainer
+
+Portainer is exposed locally on:
+
+- `http://127.0.0.1:9000`
+
+The first time you open Portainer, create the local admin user from the setup screen.
+
+After login, select or create the local Docker environment. If Portainer asks for the environment type, choose the local Docker standalone option that uses the Docker socket.
+
+For demo purposes, use Portainer to show:
+
+- running containers
+- Docker networks
+- Docker volumes
+- container logs
+- exposed ports
+- container status
+
+The Portainer container uses:
+
+- `/var/run/docker.sock:/var/run/docker.sock` to read and manage the local Docker Engine
+- `portainer_data:/data` to persist Portainer configuration
 
 ## Verified Local MVP Flow
 
@@ -447,6 +481,11 @@ The local `.env` file in this repository must contain all service ports:
 - `AUTH_SERVICE_PORT`
 - `NOTES_DATA_SERVICE_PORT`
 - `NOTES_SERVICE_PORT`
+- `KONG_PROXY_PORT`
+- `KONG_ADMIN_PORT`
+- `PROMETHEUS_PORT`
+- `GRAFANA_PORT`
+- `PORTAINER_PORT`
 
 If one of these variables is missing, Docker Compose may create the container with an empty port value or assign a random published port.
 
@@ -471,6 +510,7 @@ Recreate the service explicitly:
 docker compose -f docker-compose.dev.yml up -d --force-recreate auth-service
 docker compose -f docker-compose.dev.yml up -d --force-recreate notes-data-service
 docker compose -f docker-compose.dev.yml up -d --force-recreate notes-service
+docker compose -f docker-compose.dev.yml up -d --force-recreate portainer
 ```
 
 ### Check Running Containers
@@ -498,6 +538,7 @@ For this repository, the implementation order stays fixed:
 2. local compose integration second
 3. gateway after that
 4. monitoring after that
-5. swarm and ci/cd last
+5. docker management UI after monitoring
+6. swarm and ci/cd last
 
 The infrastructure repo should never get ahead of the application itself.
