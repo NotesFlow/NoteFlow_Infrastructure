@@ -85,6 +85,30 @@ services:
     networks:
       - app_net
 
+  kong:
+    image: kong:3.8
+    container_name: noteflow-kong
+    restart: unless-stopped
+    depends_on:
+      - auth-service
+      - notes-service
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /kong/declarative/kong.yml
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_LISTEN: 0.0.0.0:8001
+    volumes:
+      - ./kong/kong.yml:/kong/declarative/kong.yml:ro
+    ports:
+      - "${KONG_PROXY_PORT}:8000"
+      - "${KONG_ADMIN_PORT}:8001"
+    networks:
+      - gateway_net
+      - app_net
+
   adminer:
     image: adminer:4
     container_name: noteflow-adminer

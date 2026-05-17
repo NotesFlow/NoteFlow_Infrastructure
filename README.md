@@ -15,10 +15,10 @@ At this stage, the goal is to support the local MVP flow:
 - `notes-data-service`
 - `postgres`
 - `adminer`
+- `kong`
 
 The following components are intentionally postponed:
 
-- `kong`
 - `prometheus`
 - `grafana`
 - `portainer`
@@ -35,13 +35,13 @@ Currently implemented in this repository:
 - `notes-data-service` in `docker-compose.dev.yml`
 - `notes-service` in `docker-compose.dev.yml`
 - explicit Docker networks for local service separation
+- `kong` in DB-less mode
 
 Planned next additions, in order:
 
-1. `kong`
-2. monitoring
-3. `portainer`
-4. swarm and ci/cd
+1. monitoring
+2. `portainer`
+3. swarm and ci/cd
 
 ## Local Stack Layout
 
@@ -49,6 +49,14 @@ The target local development stack is:
 
 ```text
 Client
+  -> kong
+      -> auth-service
+      -> notes-service
+          -> auth-service /me
+          -> notes-data-service
+              -> postgres
+
+Direct local debugging
   -> auth-service
   -> notes-service
       -> auth-service /me
@@ -74,6 +82,7 @@ The local Compose stack uses explicit bridge networks to keep service responsibi
 
 ```text
 app_net
+  kong
   auth-service
   notes-service
   notes-data-service
@@ -88,7 +97,7 @@ admin_net
   adminer
 
 gateway_net
-  reserved for Kong
+  kong
 
 monitoring_net
   reserved for Prometheus and Grafana
@@ -97,10 +106,12 @@ monitoring_net
 The current network rules are:
 
 - `notes-service` can call `auth-service` and `notes-data-service` through `app_net`.
+- `kong` can forward public traffic to `auth-service` and `notes-service` through `app_net`.
 - `auth-service` can call `postgres` through `data_net`.
 - `notes-data-service` can call `postgres` through `data_net`.
 - `adminer` can inspect `postgres` through `data_net`.
-- `gateway_net` and `monitoring_net` are defined now so the next infrastructure phases can be added cleanly.
+- `gateway_net` is used by Kong as the public gateway layer.
+- `monitoring_net` is reserved for Prometheus and Grafana.
 
 ## Environment Variables
 
@@ -117,6 +128,8 @@ ADMINER_PORT=8080
 AUTH_SERVICE_PORT=8001
 NOTES_SERVICE_PORT=8002
 NOTES_DATA_SERVICE_PORT=8003
+KONG_PROXY_PORT=8000
+KONG_ADMIN_PORT=8005
 ```
 
 These ports are the standard local ports we will keep across the project unless there is a concrete reason to change them.
@@ -132,6 +145,7 @@ At the moment it provisions:
 - `auth-service`
 - `notes-data-service`
 - `notes-service`
+- `kong`
 
 It will be extended step by step instead of adding the whole platform at once.
 
@@ -166,6 +180,8 @@ After starting the current stack, these services are available from the host:
 - `auth-service` on `127.0.0.1:8001`
 - `notes-data-service` on `127.0.0.1:8003`
 - `notes-service` on `127.0.0.1:8002`
+- `kong` proxy on `127.0.0.1:8000`
+- `kong` admin API on `127.0.0.1:8005`
 
 ## Database Access In Browser
 
@@ -215,6 +231,28 @@ The service is exposed locally on:
 The service is exposed locally on:
 
 - `http://127.0.0.1:8002`
+
+## Kong Gateway In Compose
+
+Kong runs in DB-less mode and reads its routes from:
+
+- [kong/kong.yml](kong/kong.yml)
+
+Current routes:
+
+- `http://127.0.0.1:8000/auth` -> `auth-service`
+- `http://127.0.0.1:8000/notes` -> `notes-service`
+
+Kong Admin API is exposed locally on:
+
+- `http://127.0.0.1:8005`
+
+Useful checks:
+
+```text
+http://127.0.0.1:8005/services
+http://127.0.0.1:8005/routes
+```
 
 ## Verified Local MVP Flow
 
@@ -284,6 +322,49 @@ http://127.0.0.1:8080
 ```
 
 9. Confirm that the `users` and `notes` tables contain the expected data.
+
+## Recommended Kong Workflow
+
+After the stack is running, Kong should be used as the public API entry point.
+
+Use these URLs:
+
+- `http://127.0.0.1:8000/auth/register`
+- `http://127.0.0.1:8000/auth/login`
+- `http://127.0.0.1:8000/notes`
+
+The expected flow is:
+
+1. Register through Kong:
+
+```text
+POST http://127.0.0.1:8000/auth/register
+```
+
+2. Login through Kong:
+
+```text
+POST http://127.0.0.1:8000/auth/login
+```
+
+3. Copy the JWT access token.
+
+4. Use the token with the `notes` route through Kong:
+
+```text
+GET http://127.0.0.1:8000/notes
+POST http://127.0.0.1:8000/notes
+PUT http://127.0.0.1:8000/notes/{note_id}
+PATCH http://127.0.0.1:8000/notes/{note_id}/archive
+PATCH http://127.0.0.1:8000/notes/{note_id}/pin
+DELETE http://127.0.0.1:8000/notes/{note_id}
+```
+
+The direct service URLs remain available for debugging:
+
+- `http://127.0.0.1:8001/docs`
+- `http://127.0.0.1:8002/docs`
+- `http://127.0.0.1:8003/docs`
 
 ## Troubleshooting
 
