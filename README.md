@@ -16,11 +16,11 @@ At this stage, the goal is to support the local MVP flow:
 - `postgres`
 - `adminer`
 - `kong`
+- `prometheus`
+- `grafana`
 
 The following components are intentionally postponed:
 
-- `prometheus`
-- `grafana`
 - `portainer`
 - `docker swarm`
 - `ci/cd`
@@ -36,12 +36,13 @@ Currently implemented in this repository:
 - `notes-service` in `docker-compose.dev.yml`
 - explicit Docker networks for local service separation
 - `kong` in DB-less mode
+- `prometheus` in `docker-compose.dev.yml`
+- `grafana` in `docker-compose.dev.yml`
 
 Planned next additions, in order:
 
-1. monitoring
-2. `portainer`
-3. swarm and ci/cd
+1. `portainer`
+2. swarm and ci/cd
 
 ## Local Stack Layout
 
@@ -65,6 +66,14 @@ Direct local debugging
 
 Adminer
   -> postgres
+
+Prometheus
+  -> auth-service /metrics
+  -> notes-service /metrics
+  -> notes-data-service /metrics
+
+Grafana
+  -> prometheus
 ```
 
 For Docker-based local development, services should communicate through Docker DNS names, not through local WSL IP addresses.
@@ -100,7 +109,8 @@ gateway_net
   kong
 
 monitoring_net
-  reserved for Prometheus and Grafana
+  prometheus
+  grafana
 ```
 
 The current network rules are:
@@ -111,7 +121,8 @@ The current network rules are:
 - `notes-data-service` can call `postgres` through `data_net`.
 - `adminer` can inspect `postgres` through `data_net`.
 - `gateway_net` is used by Kong as the public gateway layer.
-- `monitoring_net` is reserved for Prometheus and Grafana.
+- `prometheus` scrapes metrics from the FastAPI services through `app_net`.
+- `grafana` reads metrics from Prometheus through `monitoring_net`.
 
 ## Environment Variables
 
@@ -130,6 +141,10 @@ NOTES_SERVICE_PORT=8002
 NOTES_DATA_SERVICE_PORT=8003
 KONG_PROXY_PORT=8000
 KONG_ADMIN_PORT=8005
+PROMETHEUS_PORT=9090
+GRAFANA_PORT=3000
+GRAFANA_ADMIN_USER=admin
+GRAFANA_ADMIN_PASSWORD=admin
 ```
 
 These ports are the standard local ports we will keep across the project unless there is a concrete reason to change them.
@@ -146,6 +161,8 @@ At the moment it provisions:
 - `notes-data-service`
 - `notes-service`
 - `kong`
+- `prometheus`
+- `grafana`
 
 It will be extended step by step instead of adding the whole platform at once.
 
@@ -182,6 +199,8 @@ After starting the current stack, these services are available from the host:
 - `notes-service` on `127.0.0.1:8002`
 - `kong` proxy on `127.0.0.1:8000`
 - `kong` admin API on `127.0.0.1:8005`
+- `prometheus` on `127.0.0.1:9090`
+- `grafana` on `127.0.0.1:3000`
 
 ## Database Access In Browser
 
@@ -253,6 +272,57 @@ Useful checks:
 http://127.0.0.1:8005/services
 http://127.0.0.1:8005/routes
 ```
+
+## Monitoring In Compose
+
+Prometheus reads its scrape configuration from:
+
+- [prometheus.yml](prometheus.yml)
+
+Current scrape targets:
+
+- `auth-service:8001/metrics`
+- `notes-service:8002/metrics`
+- `notes-data-service:8003/metrics`
+
+Prometheus is exposed locally on:
+
+- `http://127.0.0.1:9090`
+
+Useful Prometheus checks:
+
+```text
+http://127.0.0.1:9090/targets
+```
+
+Useful PromQL queries:
+
+```promql
+up
+```
+
+```promql
+rate(http_requests_total[1m])
+```
+
+Grafana is exposed locally on:
+
+- `http://127.0.0.1:3000`
+
+Default local credentials:
+
+- username: `admin`
+- password: `admin`
+
+Grafana provisioning files:
+
+- [grafana/provisioning/datasources/prometheus.yml](grafana/provisioning/datasources/prometheus.yml)
+- [grafana/provisioning/dashboards/noteflow.yml](grafana/provisioning/dashboards/noteflow.yml)
+- [grafana/dashboards/noteflow-fastapi.json](grafana/dashboards/noteflow-fastapi.json)
+
+Dashboard:
+
+- `NoteFlow FastAPI Monitoring`
 
 ## Verified Local MVP Flow
 
