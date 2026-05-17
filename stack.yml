@@ -20,7 +20,7 @@ services:
         condition: on-failure
 
   auth-service:
-    image: noteflow-auth-service:local
+    image: albertart10/noteflow-auth-service:latest
     environment:
       AUTH_SERVICE_PORT: 8001
       APP_NAME: NoteFlow Auth Service
@@ -50,7 +50,7 @@ services:
         max_attempts: 5
 
   notes-data-service:
-    image: noteflow-notes-data-service:local
+    image: albertart10/noteflow-notes-data-service:latest
     environment:
       NOTES_DATA_SERVICE_HOST: 0.0.0.0
       NOTES_DATA_SERVICE_PORT: 8003
@@ -75,7 +75,7 @@ services:
         max_attempts: 5
 
   notes-service:
-    image: noteflow-notes-service:local
+    image: albertart10/noteflow-notes-service:latest
     environment:
       APP_NAME: NoteFlow Notes Service
       APP_VERSION: 0.1.0

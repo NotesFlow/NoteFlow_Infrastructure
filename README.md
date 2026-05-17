@@ -21,9 +21,7 @@ At this stage, the goal is to support the local MVP flow:
 - `portainer`
 - docker swarm
 
-The following components are intentionally postponed:
-
-- `ci/cd`
+The base CI/CD setup is handled in the three microservice repositories through GitHub Actions.
 
 ## Current Status
 
@@ -40,10 +38,7 @@ Currently implemented in this repository:
 - `grafana` in `docker-compose.dev.yml`
 - `portainer` in `docker-compose.dev.yml`
 - `stack.yml` for Docker Swarm deployment
-
-Planned next additions, in order:
-
-1. ci/cd
+- Docker Hub images referenced from `stack.yml`
 
 ## Local Stack Layout
 
@@ -181,13 +176,13 @@ The core local stack is now functional and verified.
 
 - [stack.yml](stack.yml)
 
-The Swarm stack uses prebuilt local images for the three project microservices:
+The Swarm stack uses Docker Hub images for the three project microservices:
 
-- `noteflow-auth-service:local`
-- `noteflow-notes-service:local`
-- `noteflow-notes-data-service:local`
+- `albertart10/noteflow-auth-service:latest`
+- `albertart10/noteflow-notes-service:latest`
+- `albertart10/noteflow-notes-data-service:latest`
 
-This is the local demo setup. In the CI/CD phase, these local image tags should be replaced with images published to Docker Hub or another registry.
+These images are built and published by GitHub Actions from each service repository.
 
 The Swarm stack provisions:
 
@@ -232,15 +227,9 @@ docker compose -f docker-compose.dev.yml up -d --build
 
 ## Run With Docker Swarm
 
-The local Swarm demo uses `stack.yml` and local Docker images.
+The Swarm demo uses `stack.yml` and Docker Hub images.
 
-Build the local images first:
-
-```bash
-docker build -t noteflow-auth-service:local ../NoteFlow_Auth-service
-docker build -t noteflow-notes-service:local ../NoteFlow_Notes-service
-docker build -t noteflow-notes-data-service:local ../NoteFlow_Notes-Data-service
-```
+Before deploying Swarm, make sure the GitHub Actions pipelines in the three service repositories have published the required images to Docker Hub.
 
 If the Compose stack is already running, stop it before deploying the Swarm stack because both setups publish the same local ports:
 
@@ -257,7 +246,7 @@ docker swarm init
 Deploy the stack:
 
 ```bash
-docker stack deploy --resolve-image never -c stack.yml noteflow
+docker stack deploy -c stack.yml noteflow
 ```
 
 Check services:
@@ -301,12 +290,47 @@ After removing the Swarm stack, the Compose stack can be started again with:
 docker compose -f docker-compose.dev.yml up -d
 ```
 
+## CI/CD Setup
+
+Each microservice repository has a GitHub Actions workflow at:
+
+- `.github/workflows/docker-image.yml`
+
+The workflow runs on:
+
+- push to `main`
+- pull request to `main`
+- manual `workflow_dispatch`
+
+For each service, the workflow:
+
+- installs Python dependencies
+- runs `pytest`
+- builds the Docker image
+- publishes the image to Docker Hub on non-pull-request runs
+
+Required GitHub Actions secrets in each microservice repository:
+
+- `DOCKERHUB_USERNAME`
+- `DOCKERHUB_TOKEN`
+
+Docker Hub images:
+
+- `albertart10/noteflow-auth-service`
+- `albertart10/noteflow-notes-service`
+- `albertart10/noteflow-notes-data-service`
+
+Published tags:
+
+- `latest`
+- `sha-<commit-sha>`
+
 ## Verified Swarm Flow
 
 The Swarm stack has been verified locally with:
 
 ```bash
-docker stack deploy --resolve-image never -c stack.yml noteflow
+docker stack deploy -c stack.yml noteflow
 ```
 
 Verified Swarm services:
