@@ -1,0 +1,50 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: auth-service
+    url: http://auth-service:8001
+    routes:
+      - name: auth-api
+        paths:
+          - /auth
+        strip_path: true
+        preserve_host: false
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+
+  - name: notes-service
+    url: http://notes-service:8002
+    routes:
+      - name: notes-api
+        paths:
+          - /notes
+        strip_path: false
+        preserve_host: false
+        methods: [GET, POST, PUT, PATCH, DELETE, OPTIONS]
+      - name: notes-docs
+        paths:
+          - /notes-docs
+        strip_path: true
+        preserve_host: false
+        methods: [GET, OPTIONS]
+
+plugins:
+  - name: cors
+    config:
+      origins:
+        - "*"
+      methods:
+        - GET
+        - POST
+        - PUT
+        - PATCH
+        - DELETE
+        - OPTIONS
+      headers:
+        - Accept
+        - Authorization
+        - Content-Type
+      exposed_headers:
+        - X-Auth-Token
+      credentials: true
+      max_age: 3600

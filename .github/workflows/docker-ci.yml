@@ -1,0 +1,44 @@
+name: Docker CI
+
+on:
+  push:
+    branches:
+      - andrei
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push auth-service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./NoteFlow_Auth-service
+          file: ./NoteFlow_Auth-service/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/noteflow-auth-service:latest
+
+      - name: Build and push notes-service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./NoteFlow_Notes-service
+          file: ./NoteFlow_Notes-service/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/noteflow-notes-service:latest
+
+      - name: Build and push notes-data-service
+        uses: docker/build-push-action@v6
+        with:
+          context: ./NoteFlow_Notes-Data-service
+          file: ./NoteFlow_Notes-Data-service/Dockerfile
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/noteflow-notes-data-service:latest

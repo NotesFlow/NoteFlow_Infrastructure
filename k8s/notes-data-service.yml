@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-data-service
+  namespace: noteflow
+
+spec:
+  replicas: 2
+
+  selector:
+    matchLabels:
+      app: notes-data-service
+
+  template:
+    metadata:
+      labels:
+        app: notes-data-service
+
+    spec:
+      containers:
+        - name: notes-data-service
+          image: noteflow/notes-data-service:latest
+          imagePullPolicy: Never
+
+          command: ["uvicorn"]
+          args: ["app.main:app", "--host", "0.0.0.0", "--port", "8003"]
+
+          ports:
+            - containerPort: 8003
+
+          env:
+            - name: DATABASE_URL
+              value: postgresql://noteflow_user:noteflow_pass@postgres:5432/noteflow
+
+            - name: NOTES_DATA_SERVICE_PORT
+              value: "8003"
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-data-service
+  namespace: noteflow
+
+spec:
+  selector:
+    app: notes-data-service
+
+  ports:
+    - port: 8003
+      targetPort: 8003
