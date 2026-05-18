@@ -1,0 +1,130 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: kong-config
+  namespace: noteflow
+data:
+  kong.yml: |
+    _format_version: "3.0"
+    _transform: true
+
+    services:
+      - name: auth-service
+        url: http://auth-service:8001
+        routes:
+          - name: auth-api
+            paths:
+              - /auth
+            strip_path: true
+            preserve_host: false
+
+      - name: notes-service
+        url: http://notes-service:8002
+        routes:
+          - name: notes-api
+            paths:
+              - /notes
+            strip_path: false
+            preserve_host: false
+
+    plugins:
+      - name: cors
+        config:
+          origins:
+            - "*"
+          methods:
+            - GET
+            - POST
+            - PUT
+            - PATCH
+            - DELETE
+            - OPTIONS
+          headers:
+            - Accept
+            - Authorization
+            - Content-Type
+          credentials: true
+          max_age: 3600
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kong
+  namespace: noteflow
+  labels:
+    app: kong
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: kong
+  template:
+    metadata:
+      labels:
+        app: kong
+    spec:
+      containers:
+        - name: kong
+          image: kong:3.8
+          ports:
+            - containerPort: 8000
+            - containerPort: 8001
+            - containerPort: 8100
+          env:
+            - name: KONG_DATABASE
+              value: "off"
+            - name: KONG_DECLARATIVE_CONFIG
+              value: /kong/declarative/kong.yml
+            - name: KONG_PROXY_ACCESS_LOG
+              value: /dev/stdout
+            - name: KONG_ADMIN_ACCESS_LOG
+              value: /dev/stdout
+            - name: KONG_PROXY_ERROR_LOG
+              value: /dev/stderr
+            - name: KONG_ADMIN_ERROR_LOG
+              value: /dev/stderr
+            - name: KONG_ADMIN_LISTEN
+              value: 0.0.0.0:8001
+            - name: KONG_STATUS_LISTEN
+              value: 0.0.0.0:8100
+          readinessProbe:
+            httpGet:
+              path: /status
+              port: 8100
+            initialDelaySeconds: 15
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /status
+              port: 8100
+            initialDelaySeconds: 30
+            periodSeconds: 10
+          volumeMounts:
+            - name: kong-config
+              mountPath: /kong/declarative/kong.yml
+              subPath: kong.yml
+              readOnly: true
+      volumes:
+        - name: kong-config
+          configMap:
+            name: kong-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kong
+  namespace: noteflow
+spec:
+  type: NodePort
+  selector:
+    app: kong
+  ports:
+    - name: proxy
+      port: 8000
+      targetPort: 8000
+      nodePort: 30080
+    - name: admin
+      port: 8001
+      targetPort: 8001
+      nodePort: 30081
+

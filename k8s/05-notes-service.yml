@@ -1,0 +1,87 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notes-service
+  namespace: noteflow
+  labels:
+    app: notes-service
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: notes-service
+  template:
+    metadata:
+      labels:
+        app: notes-service
+    spec:
+      initContainers:
+        - name: wait-for-application-services
+          image: busybox:1.36
+          command:
+            - /bin/sh
+            - -c
+            - |
+              until wget -q -O /dev/null http://auth-service:8001/health; do
+                echo "Waiting for auth-service"
+                sleep 2
+              done
+              until wget -q -O /dev/null http://notes-data-service:8003/health; do
+                echo "Waiting for notes-data-service"
+                sleep 2
+              done
+      containers:
+        - name: notes-service
+          image: albertart10/noteflow-notes-service:latest
+          imagePullPolicy: Always
+          ports:
+            - containerPort: 8002
+          env:
+            - name: APP_NAME
+              value: NoteFlow Notes Service
+            - name: APP_VERSION
+              value: 0.1.0
+            - name: DEBUG
+              value: "false"
+            - name: NOTES_SERVICE_HOST
+              value: 0.0.0.0
+            - name: NOTES_SERVICE_PORT
+              value: "8002"
+            - name: AUTH_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: noteflow-config
+                  key: AUTH_SERVICE_URL
+            - name: NOTES_DATA_SERVICE_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: noteflow-config
+                  key: NOTES_DATA_SERVICE_URL
+            - name: REQUEST_TIMEOUT_SECONDS
+              value: "5.0"
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8002
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notes-service
+  namespace: noteflow
+spec:
+  type: ClusterIP
+  selector:
+    app: notes-service
+  ports:
+    - name: http
+      port: 8002
+      targetPort: 8002

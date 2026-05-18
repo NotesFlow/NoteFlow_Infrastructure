@@ -2,13 +2,13 @@
 
 Infrastructure repository for the NoteFlow microservices project.
 
-This repository contains the local Docker setup used to run the core application stack during development.
+This repository contains the Docker Compose, Docker Swarm, Kubernetes, gateway, monitoring, database administration, and container management setup for the NoteFlow platform.
 
 ## Purpose
 
 The infrastructure layer is introduced only after the core microservices are functional on their own.
 
-At this stage, the goal is to support the local MVP flow:
+The infrastructure supports the complete project flow:
 
 - `auth-service`
 - `notes-service`
@@ -20,6 +20,7 @@ At this stage, the goal is to support the local MVP flow:
 - `grafana`
 - `portainer`
 - docker swarm
+- kubernetes
 
 The base CI/CD setup is handled in the three microservice repositories through GitHub Actions.
 
@@ -39,6 +40,7 @@ Currently implemented in this repository:
 - `portainer` in `docker-compose.dev.yml`
 - `stack.yml` for Docker Swarm deployment
 - Docker Hub images referenced from `stack.yml`
+- `k8s/` manifests for Kubernetes deployment on Docker Desktop Kubernetes
 
 ## Local Stack Layout
 
@@ -168,9 +170,7 @@ At the moment it provisions:
 - `grafana`
 - `portainer`
 
-It will be extended step by step instead of adding the whole platform at once.
-
-The core local stack is now functional and verified.
+The full local stack is functional and verified.
 
 ## Current Swarm Stack File
 
@@ -204,6 +204,43 @@ It uses overlay networks:
 - `data_net`
 - `monitoring_net`
 - `admin_net`
+
+## Current Kubernetes Manifests
+
+- [k8s/](k8s/)
+
+The Kubernetes deployment uses the same Docker Hub images as the Swarm stack:
+
+- `albertart10/noteflow-auth-service:latest`
+- `albertart10/noteflow-notes-service:latest`
+- `albertart10/noteflow-notes-data-service:latest`
+
+The Kubernetes manifests provision:
+
+- `noteflow` namespace
+- `postgres` with a persistent volume claim
+- `auth-service` with 2 replicas
+- `notes-data-service` with 2 replicas
+- `notes-service` with 2 replicas
+- `kong` with 2 replicas
+- `adminer`
+- `prometheus`
+- `grafana`
+
+The Kubernetes runbook is documented in [k8s/README.md](k8s/README.md).
+
+## Final Demonstration Scope
+
+The final project demo should show the complete platform in this order:
+
+1. GitHub Actions builds and publishes the three microservice images to Docker Hub.
+2. Docker Swarm deploys the platform from `stack.yml`.
+3. Kong exposes the public API through `/auth` and `/notes`.
+4. The application flow works end-to-end: register, login, create note, list notes, update note, archive note, pin note, delete note.
+5. Adminer confirms that PostgreSQL stores the application data.
+6. Prometheus shows the FastAPI services as scrape targets.
+7. Grafana shows the provisioned NoteFlow monitoring dashboard.
+8. Portainer shows the running Swarm services, tasks, networks, and volumes.
 
 ## Run Locally
 
@@ -288,6 +325,38 @@ After removing the Swarm stack, the Compose stack can be started again with:
 
 ```bash
 docker compose -f docker-compose.dev.yml up -d
+```
+
+## Run With Kubernetes
+
+Docker Desktop Kubernetes must be enabled before applying the manifests.
+
+Deploy the Kubernetes stack:
+
+```bash
+kubectl apply -f k8s/
+```
+
+Check the deployment:
+
+```bash
+kubectl get pods -n noteflow
+kubectl get svc -n noteflow
+kubectl get pvc -n noteflow
+```
+
+For local browser access, use port-forward commands from [k8s/README.md](k8s/README.md). The verified Kubernetes flow uses Kong as the public API entry point on:
+
+```text
+http://127.0.0.1:30080/auth/register
+http://127.0.0.1:30080/auth/login
+http://127.0.0.1:30080/notes
+```
+
+Remove the Kubernetes stack:
+
+```bash
+kubectl delete namespace noteflow
 ```
 
 ## CI/CD Setup
